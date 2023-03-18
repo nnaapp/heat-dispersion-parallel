@@ -9,10 +9,11 @@
 #include "loadingbar.h" // defines and draws progress bar in console, gives user something to stare at
 
 #define EXPECTED_ARGS 9
-#define TRANSFER_MAX 1.1
+#define TRANSFER_MAX 1.1000001 // floating point imprecision, man
 #define TRASNFER_MIN 1
 
 #define IMG_DEFAULT 1024
+#define IMG_MAX IMG_DEFAULT*5
 #define BPP 3
                                 // best results:
 #define B_DEFAULT 10            // 10
@@ -21,7 +22,7 @@
 #define R_DEFAULT 10            // 10
                                 //
 #define RED_SHIFT 3             // 3
-#define BLUE_SHIFT -4           // -4
+#define BLUE_SHIFT -5           // -4
 #define GREEN_SHIFT 2           // 2
 
 struct color *matrix_generate_heatmap(float *, int, int, float, int, int, int);
@@ -128,6 +129,11 @@ int main(int argc, char **argv)
 
     matrix_out(matrix, numCols, numRows, outFileName); // out to file
 
+    printf("\nHeat dispersion complete.\n");
+    printf("CSV format file saved to:\t%s\n", outFileName);
+    free(tmpMatrix);
+    free(heaters);
+
     int imgW, imgH;
     imgW = imgH = IMG_DEFAULT;
 
@@ -139,6 +145,17 @@ int main(int argc, char **argv)
     else if (numRows > numCols)
     {
         imgH = IMG_DEFAULT * ((float)numRows / (float)numCols);
+    }
+
+    if (imgW > IMG_MAX || imgH > IMG_MAX)
+    {
+        printf("\nImage could not be generated. This is likely due to the matrix being extremely lopsided.\n");
+        printf("A very lopsided matrix will result in aspect ratio preservation being too extreme.\n");
+
+        free(outImgName);
+        free(matrix);
+
+        return 0;
     }
 
     // Two methods of heatmap generation, one for matrix > img, another for img > matrix
@@ -159,14 +176,10 @@ int main(int argc, char **argv)
 
 
     /* Finalization and memory deallocation */
-    printf("\nHeat dispersion complete.\n");
-    printf("CSV format file saved to:\t%s\n", outFileName);
     printf("BMP heatmap image saved to:\t%s\n", outImgName);
 
     free(outImgName);
     free(matrix);
-    free(tmpMatrix);
-    free(heaters);
     free(heatmap);
 
     return 0;
@@ -183,14 +196,15 @@ void fill_heaters(float *matrix, struct Heater *heaters, int arrayLen, int cols)
     }
 }
 
-void fill_heaters_parallel(float *matrix, struct Heater *heaters, int arrayLen, int cols)
+// not used, was easier and faster runtime to just not
+/*void fill_heaters_parallel(float *matrix, struct Heater *heaters, int arrayLen, int cols)
 {
     #pragma omp for schedule(static)
     for (int i = 0; i < arrayLen; i++)
     {
         matrix[heaters[i].col + (heaters[i].row * cols)] = heaters[i].temp;
     }
-}
+}*/
 
 // cells per pixel mode
 // Generates a 1d array containing color data for a heatmap
