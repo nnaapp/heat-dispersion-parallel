@@ -30,4 +30,6 @@ int main(int argc, char **argv)
     }
 
     fclose(outFile);
+
+    return 0;
 }

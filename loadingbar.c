@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include "loadingbar.h"
 
+// initialized loading bars (maximum length of 512)
 struct LoadingBar loadingbar_init(int max, char Fill, char Empty, char left, char right)
 {
     struct LoadingBar bar;
 
     bar.curLen = 0;
     bar.maxLen = max;
+    if (bar.maxLen > 512)
+        bar.maxLen = 512;
     bar.percent = 0;
 
     bar.fill = Fill;
@@ -18,27 +21,35 @@ struct LoadingBar loadingbar_init(int max, char Fill, char Empty, char left, cha
     return bar;
 }
 
+// draws loading bars (maximum length of 512)
 void loadingbar_draw(struct LoadingBar *bar)
 {
     // move to start of line and print left cap char
-    printf("\r%c", bar->leftCap);
-
     if (bar->curLen > bar->maxLen)
         bar->curLen = bar->maxLen;
 
     if (bar->percent > 100)
         bar->percent = 100;
 
-    printf("%d%% ", bar->percent);
-
+    char buffer[512];
+    int pos = 0;
     for (int i = 0; i < bar->curLen; i++)
-        printf("%c", bar->fill);
+    {
+        buffer[i] = bar->fill;
+        pos++;
+    }
 
-    int diff = bar->maxLen - bar->curLen;
-    for (int i = 0; i < diff; i++)
-        printf("%c", bar->empty);
+    for (int i = pos; i < bar->maxLen; i++)
+    {
+        buffer[i] = bar->empty;
+        pos++;
+    }
 
-    printf("%c", bar->rightCap);
-    
+    // print breakdown:
+    // \r     - carriage return, goes back to start of current line
+    // %c%d%% - left cap character, then percentage completion, then % sign escaped to a % literal
+    // %s%c   - string buffer, avoids printing 50 different characters one by one, and then right cap char
+    printf("\r%c%d%% %s%c", bar->leftCap, bar->percent, buffer, bar->rightCap);
+
     fflush(stdout);
 }

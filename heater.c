@@ -16,6 +16,7 @@ int get_heater_count(char *heaterFileName)
     fgets(buffer, READ_BUFFER, heaterFile); // first line (by new line char) contains number of heaters
     int numHeaters = atoi(buffer);   // aka number of lines to read
 
+    fclose(heaterFile);
     return numHeaters;
 }
 
@@ -56,5 +57,6 @@ struct Heater *get_heaters(char *heaterFileName, int numHeaters)
         heaters[i] = tmp;
     }
 
+    fclose(heaterFile);
     return heaters;
 }

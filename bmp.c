@@ -29,13 +29,13 @@ void bmp_generate_image(struct color *img, int height, int width, char *fileName
         for (int j = 0; j < width; j++)
         {
             unsigned char color[] = {img[j + (i * width)].b, img[j + (i * width)].g, img[j + (i * width)].r};
-            //printf("color %d %d : b%d g%d r%d\n", j, i, color[0], color[1], color[2]);
             fwrite(color, 1, BYTES_PER_PIXEL, imgFile);
         }
         fwrite(padding, 1, paddingSize, imgFile);
     }
-    //fprintf(imgFile, "%s", img);
 
+    free(header);
+    free(info);
     fclose(imgFile);
 }
 

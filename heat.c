@@ -8,15 +8,6 @@
 #include "bmp.h"        // defines and outputs BMP files from color arrays
 #include "loadingbar.h" // defines and draws progress bar in console, gives user something to stare at
 
-// OVERALL TODO:
-// allow the user to step through timesteps one by one or chunk by chunk.
-// allow the user to pull up image of current matrix, every time it stops after a step/steps.
-// clean up possible seg faults/etc, like with heaters in file being outside matrix range.
-// document and compile instructions.
-
-void fill_heaters(float *, struct Heater *, int, int);
-void fill_heaters_parallel(float *, struct Heater *, int, int);
-
 #define EXPECTED_ARGS 9
 
 #define IMG_DEFAULT 1024
@@ -36,6 +27,8 @@ struct color *matrix_generate_heatmap_small(float *, int, int, float, int, int, 
 void matrix_fill_chunks(struct color *, float, int, int, int, int, int, float);
 struct color matrix_avg_chunk(float *, int, int, int, int, int, float);
 void handle_loading_bar(int, int, struct LoadingBar *);
+void fill_heaters(float *, struct Heater *, int, int);
+void fill_heaters_parallel(float *, struct Heater *, int, int);
 
 int main(int argc, char **argv)
 {
@@ -78,7 +71,7 @@ int main(int argc, char **argv)
     }
 
     // initialize loading bar for use in loop
-    struct LoadingBar progress = loadingbar_init(25, '#', '-', '[', ']');
+    struct LoadingBar progress = loadingbar_init(50, '#', '-', '[', ']');
     loadingbar_draw(&progress);
 
     // initialize matrix of argument size and temp, fill it with heaters from file
@@ -96,6 +89,7 @@ int main(int argc, char **argv)
         handle_loading_bar(i, timesteps - 1, &progress);
     }
     fill_heaters(matrix, heaters, heaterCount, numCols);
+    printf("\n");
 
     matrix_out(matrix, numCols, numRows, outFileName); // out to file
 
@@ -127,6 +121,13 @@ int main(int argc, char **argv)
 
     // formats the above data to a real image
     bmp_generate_image(heatmap, imgH, imgW, outImgName);
+
+    free(outImgName);
+    free(matrix);
+    free(tmpMatrix);
+    free(heaters);
+    free(heatmap);
+
     return 0;
 }
 

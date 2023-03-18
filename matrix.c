@@ -39,10 +39,11 @@ float *matrix_init(int cols, int rows, float base)
     return matrix_ptr;
 }
 
+// out of date, slow, not needed
 // Takes row/col sizes and the base temp, and allocates a matrix accordingly.
 // This version runs in parallel with given number of threads.
 // Returns matrix ptr
-float *matrix_init_parallel(int cols, int rows, float base, int numThreads)
+/*float *matrix_init_parallel(int cols, int rows, float base, int numThreads)
 {
     // each column is a pointer to an array (pointer)
     float *matrix_ptr = (float *)malloc((cols * rows) * sizeof(float));
@@ -57,7 +58,7 @@ float *matrix_init_parallel(int cols, int rows, float base, int numThreads)
     }
 
     return matrix_ptr;
-}
+}*/
 
 // Takes 2d array matrix, its dimensions, and an output file name.
 // Prints a buffer containing every cell of the matrix to the given file.
@@ -110,10 +111,11 @@ void matrix_out(float *matrix, int cols, int rows, char *outFileName)
     free(write_buffer);
 }
 
+// out of date, useless
 // Serial code for matrix time step.
 // No return value, calculates matrix one timestep ahead
 // and reuses the same matrix pointer.
-void matrix_step(float *matrix, int cols, int rows, float k, float base)
+/*void matrix_step(float *matrix, int cols, int rows, float k, float base)
 {
     float *tmpMatrix = matrix_init_empty(cols, rows);
 
@@ -136,7 +138,7 @@ void matrix_step(float *matrix, int cols, int rows, float k, float base)
     }
 
     free(tmpMatrix);
-}
+}*/
 
 // Takes ADDRESS of matrix (this is necessary for efficient swapping and avoiding memory leaks)
 // as well as dimensions of matrix, transfer rate, temperature, and thread count.
@@ -162,14 +164,9 @@ void matrix_step_parallel(float **matrix, float **tmpMatrix, int cols, int rows,
         }
     }
 
-    // only one thread needs to swap these,
-    // the pointers will change universally
-    //#pragma omp single
-    //{
     float *tmp = *matrix;
     *matrix = *tmpMatrix; // put tmpMatrix at the address of main matrix
     *tmpMatrix = tmp;
-    //}
 }
 
 // Takes a matrix (float *), coordinates, dimensions, and a default temperature.
