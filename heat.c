@@ -24,11 +24,12 @@
 
 struct color *matrix_generate_heatmap(float *, int, int, float, int, int, int);
 struct color *matrix_generate_heatmap_small(float *, int, int, float, int, int, int);
-void matrix_fill_chunks(struct color *, float, int, int, int, int, int, float);
-struct color matrix_avg_chunk(float *, int, int, int, int, int, float);
+void fill_pixels(struct color *, float, int, int, int, int, int, float);
+struct color avg_cell_chunk(float *, int, int, int, int, int, float);
 void handle_loading_bar(int, int, struct LoadingBar *);
 void fill_heaters(float *, struct Heater *, int, int);
 void fill_heaters_parallel(float *, struct Heater *, int, int);
+
 
 int main(int argc, char **argv)
 {
@@ -122,6 +123,10 @@ int main(int argc, char **argv)
     // formats the above data to a real image
     bmp_generate_image(heatmap, imgH, imgW, outImgName);
 
+    printf("Heat dispersion complete.\n");
+    printf("CSV format file saved to:\t%s\n", outFileName);
+    printf("BMP heatmap image saved to:\t%s\n", outImgName);
+
     free(outImgName);
     free(matrix);
     free(tmpMatrix);
@@ -130,6 +135,7 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
 
 // Takes a 2d array matrix, array of heaters, and the number of heaters.
 // Returns the matrix with the heaters placed where they belong, based on struct.
@@ -150,42 +156,46 @@ void fill_heaters_parallel(float *matrix, struct Heater *heaters, int arrayLen, 
     }
 }
 
-// pixels per chunk mode
-// TODO: parallelize, optimize for speed
+// cells per pixel mode
 struct color *matrix_generate_heatmap(float *matrix, int cols, int rows, float base, int pixelBytes, int imgW, int imgH)
 {
     struct color *map = (struct color *)malloc((imgW * imgH) * sizeof(struct color));
 
-    int chunk_x = cols / imgW;
-    int remainder_x = cols - (chunk_x * imgW);
-    const int bonus_x = remainder_x;
+    const int cells_per_pixel_x = cols / imgW;
+    const int cells_per_pixel_y = rows / imgH;
 
-    int chunk_y = rows / imgH;
-    int remainder_y = rows - (chunk_y * imgH);
-    const int bonus_y = remainder_y;
+    const int remainder_x = cols - (cells_per_pixel_x * imgW);
+    const int remainder_y = rows - (cells_per_pixel_y * imgH);
 
+    int ypos, yend, yrem;
+    ypos = yend = 0;
+    yrem = remainder_y;
     for (int i = 0; i < imgH; i++)
     {
+        ypos = yend;
+        yend = ypos + cells_per_pixel_y;
+
+        if (yrem > 0)
+        {
+            yrem--;
+            yend++;
+        }
+
+        int xpos, xend, xrem;
+        xpos = xend = 0;
+        xrem = remainder_x;
         for (int j = 0; j < imgW; j++)
         {
-            int xpos = (chunk_x * j) + (bonus_x - remainder_x);
-            int ypos = (chunk_y * i) + (bonus_y - remainder_y);
+            xpos = xend;
+            xend = xpos + cells_per_pixel_x;
 
-            int c_width = chunk_x;
-            if (remainder_x > 0)
+            if (xrem > 0)
             {
-                c_width++;
-                remainder_x--;
-            }
-
-            int c_height = chunk_y;
-            if (remainder_y > 0)
-            {
-                c_height++;
-                remainder_y--;
+                xrem--;
+                xend++;
             }
             
-            struct color chunk = matrix_avg_chunk(matrix, xpos, xpos + c_width, ypos, ypos + c_height, cols, base);
+            struct color chunk = avg_cell_chunk(matrix, xpos, xend, ypos, yend, cols, base);
 
             map[j + (i * imgW)] = chunk;
         }
@@ -194,18 +204,17 @@ struct color *matrix_generate_heatmap(float *matrix, int cols, int rows, float b
     return map;
 }
 
-// chunks per pixel mode
-// TODO: parallelize, optimize for speed
+// pixels per cell mode
 struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, float base, int pixelBytes, int imgW, int imgH)
 {
     struct color *map = (struct color *)malloc((imgW * imgH) * sizeof(struct color));
 
     // x/y chunks per pixel, and remainder chunks after those
-    int chunks_per_pixel_x = 1. / ((float)cols / (float)imgW);
-    int chunks_per_pixel_y = 1. / ((float)rows / (float)imgH);
+    int pixels_per_cell_x = 1. / ((float)cols / (float)imgW);
+    int pixels_per_cell_y = 1. / ((float)rows / (float)imgH);
 
-    int remainder_x = imgW - (chunks_per_pixel_x * cols);
-    int remainder_y = imgH - (chunks_per_pixel_y * rows);
+    int remainder_x = imgW - (pixels_per_cell_x * cols);
+    int remainder_y = imgH - (pixels_per_cell_y * rows);
 
 
     int ypos, yend, yrem;
@@ -214,7 +223,7 @@ struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, f
     for (int i = 0; i < rows; i++)
     {
         ypos = yend;
-        yend = ypos + chunks_per_pixel_y;
+        yend = ypos + pixels_per_cell_y;
 
         if (yrem > 0)
         {
@@ -228,7 +237,7 @@ struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, f
         for (int j = 0; j < cols; j++)
         {
             xpos = xend;
-            xend = xpos + chunks_per_pixel_x;
+            xend = xpos + pixels_per_cell_x;
 
             if (xrem > 0)
             {
@@ -236,17 +245,14 @@ struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, f
                 xend++;
             }
 
-            //printf("%d - %d | %d - %d | %d | %d\n", xpos, xend, ypos, yend, xrem, yrem);
-
-            matrix_fill_chunks(map, matrix[j + (i * cols)], xpos, xend, ypos, yend, imgW, base);
+            fill_pixels(map, matrix[j + (i * cols)], xpos, xend, ypos, yend, imgW, base);
         }
     }
 
     return map;
 }
 
-// TODO: try to simplify
-void matrix_fill_chunks(struct color *map, float pixel, int start_x, int end_x, int start_y, int end_y, int imgW, float base)
+void fill_pixels(struct color *map, float pixel, int start_x, int end_x, int start_y, int end_y, int imgW, float base)
 {
     struct color default_color;
     default_color.b = B_DEFAULT;
@@ -285,7 +291,6 @@ void matrix_fill_chunks(struct color *map, float pixel, int start_x, int end_x, 
     newColor.b = b;
     newColor.g = g;
     newColor.r = r;
-    //printf("%d %d %d\n", b, g, r);
 
     for (int i = start_y; i < end_y; i++)
     {
@@ -296,8 +301,7 @@ void matrix_fill_chunks(struct color *map, float pixel, int start_x, int end_x, 
     }
 }
 
-// TODO: try to simplify, maybe parallelize if possible
-struct color matrix_avg_chunk(float *matrix, int start_x, int end_x, int start_y, int end_y, int cols, float base)
+struct color avg_cell_chunk(float *matrix, int start_x, int end_x, int start_y, int end_y, int cols, float base)
 {
     struct color default_color;
     default_color.b = B_DEFAULT;
@@ -314,8 +318,6 @@ struct color matrix_avg_chunk(float *matrix, int start_x, int end_x, int start_y
             int b = default_color.b;
             int g = default_color.g;
             int r = default_color.r;
-
-            //float diff = matrix[j + (i * cols)] - base;
 
             float relativeTemp = matrix[j + (i * cols)] - base;
 
@@ -344,7 +346,7 @@ struct color matrix_avg_chunk(float *matrix, int start_x, int end_x, int start_y
     }
 
     int total = (end_x - start_x) * (end_y - start_y);
-    //printf("%d\n", total);
+
     blueAvg  /= total;
     greenAvg /= total;
     redAvg   /= total;

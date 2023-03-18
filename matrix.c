@@ -62,6 +62,7 @@ float *matrix_init(int cols, int rows, float base)
 
 // Takes 2d array matrix, its dimensions, and an output file name.
 // Prints a buffer containing every cell of the matrix to the given file.
+// Done this way to avoid literally 25 million fprintf's, because thats slow.
 void matrix_out(float *matrix, int cols, int rows, char *outFileName)
 {
     int writeBuffSize = (cols * rows) * (sizeof(char) * WRITE_BUFF_MULT);
@@ -84,7 +85,7 @@ void matrix_out(float *matrix, int cols, int rows, char *outFileName)
         for (int j = 0; j < cols; j++)
         {
             // Converts float to string and stores it in a 64 byte buffer
-            snprintf(convert_buffer, sizeof(convert_buffer), "%.1f,\t", matrix[j + (i * cols)]);
+            snprintf(convert_buffer, sizeof(convert_buffer), "%.1f,", matrix[j + (i * cols)]);
             // Concatonates to main buffer by null terminator
             int numLen = strlen(convert_buffer);
             for (int k = 0; k < numLen; k++)
