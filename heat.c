@@ -9,6 +9,8 @@
 #include "loadingbar.h" // defines and draws progress bar in console, gives user something to stare at
 
 #define EXPECTED_ARGS 9
+#define TRANSFER_MAX 1.1
+#define TRASNFER_MIN 1
 
 #define IMG_DEFAULT 1024
 #define BPP 3
@@ -40,14 +42,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // command line arg variables
+    /* Command line arguments and parsing*/
     int numThreads, numRows, numCols, timesteps;
     float baseTemp, transferRate;
     char *heaterFileName;
     char *outFileName;
     char *outImgName;
 
-    // Parsing and initializing variables for command line args
     numThreads = atoi(argv[1]);
     numRows = atoi(argv[2]);
     numCols = atoi(argv[3]);
@@ -60,6 +61,35 @@ int main(int argc, char **argv)
     outImgName = (char *)malloc(sizeof(char) * strlen(outFileName) + 4);
     strcpy(outImgName, outFileName);
     strcat(outImgName, ".bmp");
+
+
+    /* Argument validation and error prevention */
+    if (numThreads < 1)
+    {
+        printf("Invalid number of threads, must be >0.\n");
+        return 1;
+    }
+
+    if (numRows < 1 || numCols < 1)
+    {
+        printf("Invalid matrix dimensions, must be 1x1 or greater.\n");
+        return 1;
+    }
+
+    if (timesteps < 1)
+    {
+        printf("Invalid number of timesteps, must be >0, time can't go backwards.\n");
+        return 1;
+    }
+
+    if (transferRate > TRANSFER_MAX || transferRate < TRASNFER_MIN)
+    {
+        printf("Invalid heat transfer rate, choose a number between 1 and 1.1 (inclusive).\n");
+        return 1;
+    }
+
+
+    /* File reading, data and variable initialization */
 
     // heaters is a pointer array of heater structs to contain the row/col/temp of each heater
     // dynamic arrays are impossible to calculate the length of in code, so that is stored from file
@@ -76,8 +106,12 @@ int main(int argc, char **argv)
     loadingbar_draw(&progress);
 
     // initialize matrix of argument size and temp, fill it with heaters from file
+    // these matrices persist, and are swapped around instead of re-allocated
     float *matrix = matrix_init(numCols, numRows, baseTemp);
     float *tmpMatrix = matrix_init_empty(numCols, numRows);
+
+
+    /* Matrix timesteps, data processing into CSV and BMP image */
 
     // timesteps equate to a "step" in time, the length of which is arbitrary.
     // each time step runs the equation on each cell once, and then the heaters
@@ -123,7 +157,9 @@ int main(int argc, char **argv)
     // formats the above data to a real image
     bmp_generate_image(heatmap, imgH, imgW, outImgName);
 
-    printf("Heat dispersion complete.\n");
+
+    /* Finalization and memory deallocation */
+    printf("\nHeat dispersion complete.\n");
     printf("CSV format file saved to:\t%s\n", outFileName);
     printf("BMP heatmap image saved to:\t%s\n", outImgName);
 
@@ -157,6 +193,9 @@ void fill_heaters_parallel(float *matrix, struct Heater *heaters, int arrayLen, 
 }
 
 // cells per pixel mode
+// Generates a 1d array containing color data for a heatmap
+// Takes matrix and dimension data to accomplish this
+// This one is for matrices larger than the image being generated
 struct color *matrix_generate_heatmap(float *matrix, int cols, int rows, float base, int pixelBytes, int imgW, int imgH)
 {
     struct color *map = (struct color *)malloc((imgW * imgH) * sizeof(struct color));
@@ -205,6 +244,9 @@ struct color *matrix_generate_heatmap(float *matrix, int cols, int rows, float b
 }
 
 // pixels per cell mode
+// Generates a 1d array containing color data for a heatmap
+// Takes matrix and dimension data to accomplish this
+// This one is for matrices smaller than the image being generated
 struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, float base, int pixelBytes, int imgW, int imgH)
 {
     struct color *map = (struct color *)malloc((imgW * imgH) * sizeof(struct color));
@@ -252,6 +294,9 @@ struct color *matrix_generate_heatmap_small(float *matrix, int cols, int rows, f
     return map;
 }
 
+// Fills in multiple pixels in the output array,
+// equal to a "chunk" of matrix cells, of a given size.
+// Math to figure out chunk size is done elsewhere and fed in.
 void fill_pixels(struct color *map, float pixel, int start_x, int end_x, int start_y, int end_y, int imgW, float base)
 {
     struct color default_color;
@@ -301,6 +346,10 @@ void fill_pixels(struct color *map, float pixel, int start_x, int end_x, int sta
     }
 }
 
+// Averages a "chunk" of cells in the matrix,
+// of a given size. This forms an averaged heat
+// pixel in the final image.
+// Math done elsewhere for chunk size, and fed in.
 struct color avg_cell_chunk(float *matrix, int start_x, int end_x, int start_y, int end_y, int cols, float base)
 {
     struct color default_color;
@@ -366,6 +415,9 @@ struct color avg_cell_chunk(float *matrix, int start_x, int end_x, int start_y, 
     return chunk;
 }
 
+// Handles loading bar, checks if it needs an update.
+// Conditions for update are an increase in whole-number percent,
+// or another filling-character needing to be placed.
 void handle_loading_bar(int loop_pos, int timesteps, struct LoadingBar *bar)
 {
     unsigned long curProgress = (((unsigned long)loop_pos) * bar->maxLen) / timesteps;

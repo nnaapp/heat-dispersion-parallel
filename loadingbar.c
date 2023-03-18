@@ -2,6 +2,7 @@
 #include "loadingbar.h"
 
 // initialized loading bars (maximum length of 512)
+// Basically a constructor, but this is C and I wouldn't make it a class anyway.
 struct LoadingBar loadingbar_init(int max, char Fill, char Empty, char left, char right)
 {
     struct LoadingBar bar;
@@ -22,6 +23,10 @@ struct LoadingBar loadingbar_init(int max, char Fill, char Empty, char left, cha
 }
 
 // draws loading bars (maximum length of 512)
+// Draws on the same line, using \r to return to start,
+// so as to not be ugly and clutter the command prompt.
+// Buffer must be flushed, or it will not work right due to
+// the usage of \r, I believe.
 void loadingbar_draw(struct LoadingBar *bar)
 {
     // move to start of line and print left cap char

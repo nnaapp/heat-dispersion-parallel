@@ -3,7 +3,6 @@
 #include <string.h>
 #include <omp.h>
 #include "matrix.h"
-#include <stdbool.h>
 #include <math.h>
 
 #define WRITE_BUFF_MULT 8
